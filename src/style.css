@@ -352,6 +352,8 @@ button span {
 }
 .view-tabs {
   display: flex;
+  min-width: 0;
+  overflow-x: auto;
   gap: 3px;
   background: #fff;
   border: 1px solid #dce2d7;
@@ -361,6 +363,7 @@ button span {
 }
 .view-tabs button {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 7px;
   padding: 8px 11px;
@@ -396,6 +399,121 @@ button span {
 }
 #stage.dragging canvas {
   cursor: grabbing;
+}
+#furniture-toolbar {
+  position: absolute;
+  top: 28px;
+  left: 12px;
+  right: 12px;
+  margin: auto;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  z-index: 4;
+  padding: 9px 12px;
+  border: 1px solid #cbd9c6;
+  border-radius: 10px;
+  background: #fffffff5;
+  box-shadow: 0 4px 16px #304d3520;
+  touch-action: auto;
+}
+#furniture-toolbar[hidden],
+#render-view[hidden] {
+  display: none;
+}
+#toolbar-name {
+  display: block;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  margin-bottom: 6px;
+  color: #52704c;
+}
+.toolbar-controls,
+.rotation-buttons {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.toolbar-controls .button,
+.rotation-buttons .button {
+  padding: 8px;
+  font-size: 12px;
+  min-height: 40px;
+  white-space: nowrap;
+}
+.toolbar-controls svg {
+  width: 15px;
+  height: 15px;
+}
+.toolbar-angle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.toolbar-angle input {
+  width: 64px;
+  padding: 8px 4px;
+  min-height: 40px;
+}
+.rotation-buttons {
+  margin-top: 9px;
+}
+.rotation-buttons .button {
+  flex: 1;
+}
+#render-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 5;
+  background: #fff;
+  touch-action: auto;
+}
+#render-view > img {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  object-fit: contain;
+}
+.render-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #eee9e0;
+  background: #faf8f3;
+}
+.render-footer p {
+  color: #685037;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.render-footer p span {
+  display: block;
+  font-size: 12px;
+  color: #8e8372;
+}
+.render-footer > div {
+  display: flex;
+  gap: 8px;
+  margin-top: 9px;
+  flex-wrap: wrap;
+}
+.render-footer .button {
+  text-decoration: none;
+  font-size: 12px;
+  color: #685037;
+}
+#stage.render-mode > canvas,
+#stage.render-mode > .room-labels,
+#stage.render-mode > .stage-top,
+#stage.render-mode > .stage-actions,
+#stage.render-mode > .stage-help {
+  visibility: hidden;
+}
+#labels {
+  flex-shrink: 0;
 }
 .stage-top {
   position: absolute;

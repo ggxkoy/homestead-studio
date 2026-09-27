@@ -5,6 +5,7 @@ import {
   Plus,
   MousePointer2,
   RotateCw,
+  RotateCcw,
   Box,
   X,
   Download,
@@ -58,6 +59,7 @@ const icons = {
   Plus,
   MousePointer2,
   RotateCw,
+  RotateCcw,
   Box,
   X,
   Download,
@@ -103,11 +105,14 @@ const esc = (s: string) =>
 const $ = <T extends HTMLElement = HTMLElement>(s: string) =>
   document.querySelector<T>(s)!;
 const app = $("#app");
+const cutawayUrl = "./renders/chinese-cutaway.png";
+type EditorView = View | "render";
+let editorView: EditorView = "cut";
 app.innerHTML = `
  <header class="app-header"><div class="brand"><span class="brand-mark">${icon("house")}</span><div><h1>庭院<span>空间规划</span></h1><p>12.96 × 18.30 m</p></div></div><div class="header-actions"><span id="save-status" role="status">正在读取方案…</span><button id="undo" class="icon-button" aria-label="撤销" title="撤销 Ctrl+Z">${icon("undo-2")}</button><button id="redo" class="icon-button" aria-label="重做" title="重做 Ctrl+Shift+Z">${icon("redo-2")}</button><span class="divider"></span><button id="import" class="button subtle">${icon("upload")}<span>导入方案</span></button><button id="export" class="button primary">${icon("download")}<span>导出方案</span></button></div></header>
  <main class="workspace"><aside class="rooms-panel" aria-label="房间列表"><div class="panel-heading"><div><span class="eyebrow">SPACE</span><h2>我的空间</h2></div><span class="count">${ROOMS.length}</span></div><div id="room-list"></div><div class="plan-note">${icon("info")}<p>以第二张图纸为基准<br>层高 3.3 m 暂定 · 无楼梯<br><span>局部尺寸仍需实测复核</span></p></div></aside>
- <section class="editor"><div class="editor-top"><div class="view-tabs" role="group" aria-label="视图"><button data-view="cut" class="active">${icon("layers")}3D 剖视</button><button data-view="plan">${icon("grid-2x2")}俯视摆放</button><button data-view="outside">${icon("house")}完整外观</button></div><button id="labels" class="icon-button selected" aria-label="切换房间标注" aria-pressed="true">${icon("eye")}</button></div>
- <div id="stage"><div class="stage-top"><span id="view-caption">单层 · 墙体剖切</span><span class="north">N ↑</span></div><div class="stage-actions"><button id="focus" class="button canvas-button">${icon("focus")}<span>聚焦房间</span></button><button id="overview" class="icon-button canvas-button" aria-label="全屋视角">${icon("maximize-2")}</button></div><div class="stage-help" id="stage-help">${icon("mouse-pointer-2")}拖动空白旋转 · 拖动家具摆放 · 滚轮缩放</div><div class="scene-loading" id="scene-loading">正在搭建空间…</div></div>
+ <section class="editor"><div class="editor-top"><div class="view-tabs" role="group" aria-label="视图"><button data-view="cut" class="active">${icon("layers")}3D 剖视</button><button data-view="plan">${icon("grid-2x2")}俯视摆放</button><button data-view="outside">${icon("house")}完整外观</button><button data-view="render">${icon("image-plus")}国风渲染</button></div><button id="labels" class="icon-button selected" aria-label="切换房间标注" aria-pressed="true">${icon("eye")}</button></div>
+ <div id="stage"><div id="render-view" hidden><img src="${cutawayUrl}" alt="国风实木家具宅基地鸟瞰剖面效果图，东侧为平整过道，无楼梯"><div class="render-footer"><p>国风剖面 · 风格参考图<span>此图不随家具摆放更新，布置请切回 3D 剖视。</span></p><div><button id="render-enlarge" class="button">${icon("zoom-in")}查看大图</button><a class="button" href="${cutawayUrl}" download="宅基地-国风剖面.png">${icon("download")}下载效果图</a></div></div></div><div id="furniture-toolbar" hidden role="group" aria-label="选中家具的旋转工具"><span id="toolbar-name"></span><div class="toolbar-controls"><button class="button" data-rotate="90" aria-label="家具左转90度">${icon("rotate-ccw")}左转 90°</button><button class="button" data-rotate="-90" aria-label="家具右转90度">${icon("rotate-cw")}右转 90°</button><label class="toolbar-angle">角度<input id="toolbar-rotation" type="number" step="1" aria-label="家具旋转角度" title="逆时针角度，0–359°"><span>°</span></label></div></div><div class="stage-top"><span id="view-caption">单层 · 墙体剖切</span><span class="north">N ↑</span></div><div class="stage-actions"><button id="focus" class="button canvas-button">${icon("focus")}<span>聚焦房间</span></button><button id="overview" class="icon-button canvas-button" aria-label="全屋视角">${icon("maximize-2")}</button></div><div class="stage-help" id="stage-help">${icon("mouse-pointer-2")}拖动空白旋转 · 拖动家具摆放 · 滚轮缩放</div><div class="scene-loading" id="scene-loading">正在搭建空间…</div></div>
  <div class="catalog-panel"><div class="catalog-heading"><div><span class="eyebrow">FURNITURE</span><h2>为 <span id="catalog-room">客厅</span> 添加家具</h2></div><span class="catalog-note">实木家具 · 尺寸可调整</span></div><div id="catalog" class="catalog"></div></div></section>
  <aside class="inspector" aria-label="房间与家具详情"><div id="inspector-content"></div></aside></main>
  <input hidden type="file" id="room-upload" accept="image/jpeg,image/png,image/webp" multiple><input hidden type="file" id="furniture-upload" accept="image/jpeg,image/png,image/webp" multiple><input hidden type="file" id="project-upload" accept="application/json,.json">
@@ -217,14 +222,22 @@ function gallery(photos: Photo[], target: "room" | "furniture") {
 function photosSection(target: "room" | "furniture", photos: Photo[]) {
   return `<section class="photo-section"><div class="section-heading"><h3>${target === "room" ? "房间参考照片" : "家具参考照片"} <span>${photos.length}</span></h3><button class="text-button" data-upload="${target}">${icon("plus")}上传</button></div>${gallery(photos, target)}<p class="micro">JPG / PNG / WebP · 单张 ≤ 20 MB · 最多 30 张</p></section>`;
 }
+function renderFurnitureToolbar() {
+  const f = currentItem();
+  $("#furniture-toolbar").hidden =
+    !f || editorView === "outside" || editorView === "render";
+  $("#toolbar-name").textContent = f ? f.name : "";
+  $<HTMLInputElement>("#toolbar-rotation").value = String(f?.rotation ?? 0);
+}
 function renderInspector() {
+  renderFurnitureToolbar();
   const r = roomFor(roomId),
     b = r.bounds,
     items = project.furniture.filter((f) => f.roomId === roomId),
     f = currentItem();
   $("#inspector-content").innerHTML =
     `<div class="inspector-header"><span class="eyebrow">${f ? "SELECTED FURNITURE" : "ROOM DETAILS"}</span><div class="inspector-title"><h2>${f ? esc(f.name) : r.name}</h2>${f ? `<button class="icon-button" id="deselect" aria-label="返回房间详情">${icon("x")}</button>` : ""}</div><p>${f ? r.name : `约 ${(b[2] - b[0]).toFixed(2)} × ${(b[3] - b[1]).toFixed(2)} m`}</p></div>
- ${f ? `<section class="properties"><label class="field-label">家具名称<input id="f-name" value="${esc(f.name)}" maxlength="40"></label><div class="dimensions"><label>宽 / m<input type="number" id="f-width" min="0.1" max="8" step="0.05" value="${f.width}"></label><label>深 / m<input type="number" id="f-depth" min="0.1" max="8" step="0.05" value="${f.depth}"></label><label>高 / m<input type="number" id="f-height" min="0.1" max="4" step="0.05" value="${f.height}"></label></div><div class="position-fields"><label>距西侧 / m<input type="number" id="f-x" step="0.05" value="${(f.x - b[0]).toFixed(2)}"></label><label>距北侧 / m<input type="number" id="f-z" step="0.05" value="${(f.z - b[1]).toFixed(2)}"></label></div><p class="micro">位置以家具中心计算，自动限制在当前房间内。</p><div class="rotation-row"><label>旋转角度<input type="number" id="f-rotation" step="15" value="${f.rotation}"></label><button class="button" id="rotate">${icon("rotate-cw")}转 90°</button></div><div class="object-actions"><button class="button" id="duplicate">${icon("copy")}复制</button><button class="button danger" id="delete">${icon("trash-2")}删除</button></div><p id="overlap-warning" class="overlap-warning" ${project.furniture.some((v) => v.id !== f.id && overlap(f, v)) ? "" : "hidden"}>与其他家具重叠，可继续拖动调整。</p></section>${photosSection("furniture", f.photos)}` : `<div class="room-summary"><span>${items.length}<small>件家具</small></span><span>${(project.roomPhotos[roomId] || []).length}<small>张参考照片</small></span></div><p class="room-note">${r.note}</p>${photosSection("room", project.roomPhotos[roomId] || [])}`}
+ ${f ? `<section class="properties"><label class="field-label">家具名称<input id="f-name" value="${esc(f.name)}" maxlength="40"></label><div class="dimensions"><label>宽 / m<input type="number" id="f-width" min="0.1" max="8" step="0.05" value="${f.width}"></label><label>深 / m<input type="number" id="f-depth" min="0.1" max="8" step="0.05" value="${f.depth}"></label><label>高 / m<input type="number" id="f-height" min="0.1" max="4" step="0.05" value="${f.height}"></label></div><div class="position-fields"><label>距西侧 / m<input type="number" id="f-x" step="0.05" value="${(f.x - b[0]).toFixed(2)}"></label><label>距北侧 / m<input type="number" id="f-z" step="0.05" value="${(f.z - b[1]).toFixed(2)}"></label></div><p class="micro">位置以家具中心计算，自动限制在当前房间内。</p><div class="rotation-row"><label>旋转角度 / °（逆时针）<input type="number" id="f-rotation" step="1" value="${f.rotation}"></label></div><div class="rotation-buttons"><button class="button" data-rotate="90">${icon("rotate-ccw")}左转 90°</button><button class="button" data-rotate="-90">${icon("rotate-cw")}右转 90°</button></div><p class="micro">也可使用画布上方旋转工具。R 左转，Shift+R 右转。</p><div class="object-actions"><button class="button" id="duplicate">${icon("copy")}复制</button><button class="button danger" id="delete">${icon("trash-2")}删除</button></div><p id="overlap-warning" class="overlap-warning" ${project.furniture.some((v) => v.id !== f.id && overlap(f, v)) ? "" : "hidden"}>与其他家具重叠，可继续拖动调整。</p></section>${photosSection("furniture", f.photos)}` : `<div class="room-summary"><span>${items.length}<small>件家具</small></span><span>${(project.roomPhotos[roomId] || []).length}<small>张参考照片</small></span></div><p class="room-note">${r.note}</p>${photosSection("room", project.roomPhotos[roomId] || [])}`}
  <section class="furniture-section"><div class="section-heading"><h3>房间内家具 <span>${items.length}</span></h3><button class="text-button" id="jump-catalog">${icon("plus")}添加</button></div>${items.length ? `<div class="furniture-list">${items.map((item) => `<button class="furniture-row ${item.id === furnitureId ? "active" : ""}" data-item="${item.id}"><span class="furniture-mini">${icon(CATALOG.find((c) => c.kind === item.kind)!.icon)}</span><span><strong>${esc(item.name)}</strong><small>${item.width.toFixed(2)} × ${item.depth.toFixed(2)} m${item.photos.length ? " · " + item.photos.length + " 张照片" : ""}</small></span>${icon("chevron-right")}</button>`).join("")}</div>` : `<div class="empty-furniture">还没有家具<br><span>点击下方家具库，开始布置这个房间</span></div>`}</section>
  <div class="storage-note">${icon("check")}<p>照片与方案仅保存在当前浏览器。<br>导出方案可包含全部照片，方便备份或换设备。</p></div>`;
   refreshIcons();
@@ -277,13 +290,14 @@ function addFurniture(kind: Kind, source?: Furniture) {
   }
   project.furniture.push(placed);
   scene.setFurniture(project.furniture);
-  if (scene.getView() === "outside") changeView("cut");
+  if (editorView === "outside" || editorView === "render") changeView("cut");
   setFurniture(placed.id);
   commit();
 }
 function updateItem(patch: Partial<Furniture>) {
   const old = currentItem();
   if (!old) return;
+  if (editorView === "render" || editorView === "outside") changeView("cut");
   const candidate = { ...old, ...patch };
   if (
     ![
@@ -323,8 +337,14 @@ function removeItem() {
   renderPanels();
   toast("已删除家具，可撤销恢复");
 }
-function changeView(view: View) {
-  scene.setView(view);
+function changeView(view: EditorView) {
+  editorView = view;
+  const rendered = view === "render";
+  $("#stage").classList.toggle("render-mode", rendered);
+  $("#render-view").hidden = !rendered;
+  $<HTMLButtonElement>("#labels").disabled = rendered;
+  if (!rendered) scene.setView(view);
+  renderFurnitureToolbar();
   document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((el) => {
     const active = el.dataset.view === view;
     el.classList.toggle("active", active);
@@ -366,6 +386,7 @@ function openPhoto(target: string, id: string) {
   if (!p) return;
   const dialog = $<HTMLDialogElement>("#photo-dialog");
   dialog.querySelector("img")!.src = p.data;
+  dialog.querySelector("img")!.alt = p.name;
   dialog.querySelector("p")!.textContent = p.name;
   dialog.showModal();
 }
@@ -440,7 +461,9 @@ document.addEventListener("click", (e) => {
     jumpCatalog();
   } else if (d.kind) addFurniture(d.kind as Kind);
   else if (d.item) setFurniture(d.item);
-  else if (d.view) changeView(d.view as View);
+  else if (d.view) changeView(d.view as EditorView);
+  else if (d.rotate && currentItem())
+    updateItem({ rotation: currentItem()!.rotation + Number(d.rotate) });
   else if (d.upload)
     $<HTMLInputElement>(
       d.upload === "room" ? "#room-upload" : "#furniture-upload",
@@ -460,9 +483,15 @@ document.addEventListener("click", (e) => {
       case "jump-catalog":
         jumpCatalog();
         break;
-      case "rotate":
-        updateItem({ rotation: (currentItem()!.rotation + 90) % 360 });
+      case "render-enlarge": {
+        const dialog = $<HTMLDialogElement>("#photo-dialog");
+        dialog.querySelector("img")!.src = cutawayUrl;
+        dialog.querySelector("img")!.alt = "国风实木家具宅基地剖面效果图";
+        dialog.querySelector("p")!.textContent =
+          "国风剖面 · 风格参考图，不随家具摆放更新";
+        dialog.showModal();
         break;
+      }
       case "duplicate":
         if (currentItem()) addFurniture(currentItem()!.kind, currentItem()!);
         break;
@@ -525,6 +554,8 @@ document.addEventListener("change", (e) => {
   else if (el.id === "project-upload") void importProject(el);
   else if (el.id === "f-name")
     updateItem({ name: el.value.trim() || "未命名家具" });
+  else if (el.id === "toolbar-rotation")
+    updateItem({ rotation: el.valueAsNumber });
   else if (["f-width", "f-depth", "f-height", "f-rotation"].includes(el.id))
     updateItem({ [el.id.slice(2)]: el.valueAsNumber });
   else if (el.id === "f-x")
@@ -550,7 +581,7 @@ document.addEventListener("keydown", (e) => {
       removeItem();
     }
   } else if (e.key.toLowerCase() === "r" && currentItem())
-    updateItem({ rotation: currentItem()!.rotation + 90 });
+    updateItem({ rotation: currentItem()!.rotation + (e.shiftKey ? -90 : 90) });
   else if (
     ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key) &&
     currentItem()
